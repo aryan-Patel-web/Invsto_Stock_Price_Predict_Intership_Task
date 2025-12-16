@@ -1,0 +1,11 @@
+Metric,Value
+Best Model,Gradient Boosting
+ARIMA RMSE,25.64
+GB RMSE,20.02
+ARIMA MAPE,9.24%
+GB MAPE,5.43%
+ARIMA Directional Accuracy,52.51%
+GB Directional Accuracy,51.56%
+ARIMA Strategy Return,44.57%
+GB Strategy Return,20.23%
+Buy & Hold Return,21.13%
