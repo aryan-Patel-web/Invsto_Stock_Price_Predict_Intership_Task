@@ -20,7 +20,7 @@ from statsmodels.tsa.arima.model import ARIMA
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-
+import time
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -35,15 +35,15 @@ st.set_page_config(
 )
 
 # =========================================================
-# DARK UI CSS (HEDGE FUND STYLE)
+# DARK UI CSS
 # =========================================================
 st.markdown("""
 <style>
-html, body, [class*="css"]  {
+html, body, [class*="css"] {
     background-color: #0E1117;
     color: #FAFAFA;
 }
-h1, h2, h3, h4 {
+h1, h2, h3 {
     color: #4CAF50;
 }
 .stMetric {
@@ -51,9 +51,6 @@ h1, h2, h3, h4 {
     border: 1px solid #1F2937;
     padding: 12px;
     border-radius: 8px;
-}
-.stDataFrame {
-    background-color: #111827;
 }
 button[kind="primary"] {
     background-color: #16A34A;
@@ -91,9 +88,32 @@ with st.sidebar:
 # =========================================================
 # HELPERS
 # =========================================================
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def load_data(ticker, start, end):
-    return yf.download(ticker, start=start, end=end, progress=False)
+    """
+    Streamlit Cloud–safe Yahoo Finance loader
+    """
+    try:
+        stock = yf.Ticker(ticker)
+
+        df = stock.history(
+            start=start,
+            end=end,
+            auto_adjust=False,
+            actions=False
+        )
+
+        # Fix timezone + column consistency
+        if not df.empty:
+            df.index = pd.to_datetime(df.index)
+            df = df.rename(columns=str.title)
+            return df
+
+    except Exception as e:
+        st.warning(f"Yahoo fetch error: {e}")
+
+    return pd.DataFrame()
+
 
 def build_features(df):
     df = df.copy()
@@ -132,14 +152,15 @@ if run_btn:
 
     df = load_data(stock, start_date, end_date)
 
+
     if df.empty:
-        st.error("No data available.")
+        st.error("⚠️ Yahoo Finance blocked the request. Try again later.")
         st.stop()
 
     st.success(f"Loaded {len(df)} rows")
 
     # -------------------------
-    # SAFE METRICS
+    # SUMMARY METRICS
     # -------------------------
     last_price = float(df["Close"].iloc[-1])
     first_price = float(df["Close"].iloc[0])
@@ -162,16 +183,15 @@ if run_btn:
     st.pyplot(fig)
 
     # -------------------------
-    # FEATURES
+    # FEATURE ENGINEERING
     # -------------------------
     df_feat = build_features(df)
-
     X = df_feat.drop(columns=["Target"])
     y = df_feat["Target"]
 
     split = int(len(X) * train_ratio / 100)
-    X_train, X_test = X[:split], X[split:]
-    y_train, y_test = y[:split], y[split:]
+    X_train, X_test = X.iloc[:split], X.iloc[split:]
+    y_train, y_test = y.iloc[:split], y.iloc[split:]
 
     scaler = StandardScaler()
     X_train_s = scaler.fit_transform(X_train)
@@ -182,15 +202,13 @@ if run_btn:
     # -------------------------
     st.subheader("📊 ARIMA Model")
 
-    arima_model = ARIMA(df["Close"][:split], order=(2,1,2))
+    arima_model = ARIMA(df["Close"].iloc[:split], order=(2, 1, 2))
     arima_fit = arima_model.fit()
-    arima_forecast = arima_fit.forecast(len(df["Close"][split:]))
+    arima_forecast = arima_fit.forecast(steps=len(y_test))
 
-    arima_m = metrics(df["Close"][split:], arima_forecast)
-
+    arima_m = metrics(y_test.values, arima_forecast.values)
     st.json(arima_m)
 
-    # SAVE ARIMA
     with open("arima_model.pkl", "wb") as f:
         pickle.dump(arima_fit, f)
 
@@ -205,14 +223,12 @@ if run_btn:
         max_depth=4,
         random_state=42
     )
-
     gb.fit(X_train_s, y_train)
     gb_pred = gb.predict(X_test_s)
 
-    gb_m = metrics(y_test, gb_pred)
+    gb_m = metrics(y_test.values, gb_pred)
     st.json(gb_m)
 
-    # SAVE MODELS
     joblib.dump(gb, "gb_model.joblib")
     joblib.dump(scaler, "scaler.joblib")
 
@@ -225,7 +241,7 @@ if run_btn:
         "Model": ["ARIMA", "Gradient Boosting"],
         "RMSE": [arima_m["RMSE"], gb_m["RMSE"]],
         "MAE": [arima_m["MAE"], gb_m["MAE"]],
-        "MAPE": [arima_m["MAPE"], gb_m["MAPE"]]
+        "MAPE": [arima_m["MAPE"], gb_m["MAPE"]],
     })
 
     st.dataframe(cmp, use_container_width=True)
@@ -236,9 +252,8 @@ if run_btn:
     st.subheader("🔮 Future Forecast")
 
     future_prices = last_price * (
-        1 + np.cumsum(np.random.normal(0, gb_m["RMSE"]/last_price, forecast_days))
+        1 + np.cumsum(np.random.normal(0, gb_m["RMSE"] / last_price, forecast_days))
     )
-
     future_dates = pd.date_range(df.index[-1] + timedelta(days=1), periods=forecast_days)
 
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -247,17 +262,6 @@ if run_btn:
     ax.legend()
     ax.grid(alpha=0.3)
     st.pyplot(fig)
-
-    # -------------------------
-    # DOWNLOADS
-    # -------------------------
-    st.subheader("💾 Downloads")
-
-    st.download_button(
-        "Download Model Comparison CSV",
-        cmp.to_csv(index=False),
-        file_name=f"{stock}_comparison.csv"
-    )
 
     st.success("✅ Analysis Complete — Models Saved")
 
@@ -268,10 +272,7 @@ else:
 # FOOTER
 # =========================================================
 st.divider()
-st.markdown("""
-<center>
-Stock Price Prediction Dashboard<br>
-Invsto Data Science Internship<br>
-<strong>Aryan Patel</strong>
-</center>
-""", unsafe_allow_html=True)
+st.markdown(
+    "<center>Invsto Data Science Internship<br><strong>Aryan Patel</strong></center>",
+    unsafe_allow_html=True
+)

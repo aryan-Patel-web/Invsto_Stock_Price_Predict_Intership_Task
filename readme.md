@@ -5,6 +5,8 @@
 
 ---
 
+invsto depoyed model in streamlit url = https://invsto-stock-prediction.streamlit.app/
+
 ## 📋 Project Overview
 
 This project implements a comprehensive stock price prediction pipeline for hedge fund trading, using both statistical (ARIMA) and machine learning (Gradient Boosting) approaches to forecast stock prices and evaluate trading strategies.
