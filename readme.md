@@ -344,10 +344,10 @@ This project demonstrates a complete ML pipeline from data collection to deploym
 ## Contact
 
 **Aryan Patel**  
-📧 Email: [aryanpatel77462@gmail.com]  
-📱 Phone: [+91 91407 82212] 
-🔗 LinkedIn:  [linkedin.com/in/aryan-patel-97396524b]
-💻 GitHub:[https://github.com/aryan-Patel-web]
+📧 Email: [aryanpatel77462@gmail.com]  ,
+📱 Phone: [+91 91407 82212]   , 
+🔗 LinkedIn:  [linkedin.com/in/aryan-patel-97396524b]  , 
+💻 GitHub:[https://github.com/aryan-Patel-web]    ,
 
 ---
 
